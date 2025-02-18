@@ -4397,6 +4397,8 @@ int main(int argc, char ** argv) {
 
     // register API routes
     svr->Get ("/health",              handle_health); // public endpoint (no API key check)
+    svr->Get ("/ping",                handle_health); // public endpoint (no API key check)
+    svr->Post("/ping",                handle_health); // public endpoint (no API key check)
     svr->Get ("/metrics",             handle_metrics);
     svr->Get ("/props",               handle_props);
     svr->Post("/props",               handle_props_change);
@@ -4406,6 +4408,7 @@ int main(int argc, char ** argv) {
     svr->Post("/completions",         handle_completions);
     svr->Post("/v1/completions",      handle_completions_oai);
     svr->Post("/chat/completions",    handle_chat_completions);
+    svr->Post("/invocations",         handle_chat_completions);
     svr->Post("/v1/chat/completions", handle_chat_completions);
     svr->Post("/infill",              handle_infill);
     svr->Post("/embedding",           handle_embeddings); // legacy
