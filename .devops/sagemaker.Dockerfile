@@ -38,7 +38,7 @@ RUN mkdir -p /app/full \
 FROM ubuntu:$UBUNTU_VERSION AS base
 
 RUN apt-get update \
-    && apt-get install -y libgomp1 curl\
+    && apt-get install -y libgomp1 unzip curl\
     && apt autoremove -y \
     && apt clean -y \
     && rm -rf /tmp/* /var/tmp/* \
@@ -52,6 +52,15 @@ COPY --from=build /app/lib/ /app
 FROM base AS server
 
 ENV LLAMA_ARG_HOST=0.0.0.0
+ENV MODEL_S3_PATH=""
+
+# Install AWS CLI and curl in a single RUN command to reduce layers
+# Clean up unnecessary files after installation
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip" && \
+    unzip awscliv2.zip && \
+    ./aws/install && \
+    rm -rf awscliv2.zip aws && \
+    mkdir -p /models
 
 COPY --from=build /app/full/llama-server /app
 
@@ -62,4 +71,15 @@ EXPOSE 8080
 
 HEALTHCHECK CMD [ "curl", "-f", "http://localhost:8080/health" ]
 
-ENTRYPOINT ["/bin/bash", "-c", "if [ \"$1\" = \"serve\" ]; then /app/llama-server; fi", "—"]
+ENTRYPOINT ["/bin/bash", "-c", "\
+    echo \"Starting entrypoint with arg: $1\"; \
+    if [ \"$1\" = \"serve\" ] && [ ! -z \"$MODEL_S3_PATH\" ]; then \
+        echo \"serve command detected and MODEL_S3_PATH is set to: $MODEL_S3_PATH\"; \
+        MODEL_FILE=$(basename $MODEL_S3_PATH); \
+        echo \"Downloading model file: $MODEL_FILE\"; \
+        aws s3 cp $MODEL_S3_PATH /models/; \
+        echo \"Starting llama-server with model: /models/$MODEL_FILE\"; \
+        /app/llama-server -m /models/$MODEL_FILE; \
+    else \
+        echo \"Either 'serve' command not provided or MODEL_S3_PATH not set\"; \
+    fi", "--"]
